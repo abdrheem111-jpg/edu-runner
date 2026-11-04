@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إحصائيات عداء المعرفة</title>
+<link rel="icon" href="icon.png">
+<style>
+  :root { --bg:#0b1230; --card:#16204a; --card2:#1d2a5c; --ink:#f2f5ff; --dim:#aab4dd; --gold:#ffd34d; --green:#3fd36b; --red:#ff7b7b; --line:rgba(255,255,255,.08); }
+  * { box-sizing: border-box; }
+  body { margin:0; background: radial-gradient(circle at 50% -10%, #233a85 0%, var(--bg) 55%); background-color: var(--bg); color: var(--ink);
+         font-family: "Segoe UI", Tahoma, "Geeza Pro", "Noto Kufi Arabic", sans-serif; min-height: 100vh; }
+  header { display:flex; align-items:center; gap:16px; padding: 20px 24px; flex-wrap: wrap; }
+  header img { width:54px; height:54px; border-radius: 14px; }
+  header h1 { margin:0; font-size: 28px; color: var(--gold); }
+  header .sub { color: var(--dim); font-size: 14px; }
+  header .sp { flex:1; }
+  button { font-family: inherit; font-size: 15px; font-weight: 700; border:0; border-radius: 12px; padding: 10px 18px; cursor:pointer; background: var(--card2); color: var(--ink); }
+  button.primary { background: #fff; color:#222; font-size: 18px; padding: 14px 26px; }
+  button.green { background: var(--green); color:#062; }
+  main { padding: 0 24px 40px; max-width: 1200px; margin: 0 auto; }
+  .center { text-align:center; padding: 80px 16px; }
+  .center p { color: var(--dim); }
+  .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 8px 0 22px; }
+  .kpi { background: var(--card); border-radius: 18px; padding: 16px 18px; border: 1px solid var(--line); }
+  .kpi .v { font-size: 38px; font-weight: 800; color: var(--gold); }
+  .kpi .l { color: var(--dim); font-size: 14px; margin-top: 4px; }
+  section { background: var(--card); border-radius: 18px; padding: 16px 18px; margin-bottom: 18px; border: 1px solid var(--line); }
+  section h2 { margin: 0 0 12px; font-size: 20px; display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
+  section h2 .sp { flex: 1; }
+  .days { display:flex; align-items:flex-end; gap: 6px; height: 150px; padding-top: 10px; }
+  .day { flex:1; display:flex; flex-direction: column; align-items:center; justify-content:flex-end; gap: 4px; min-width: 0; }
+  .bar { width: 100%; max-width: 38px; background: linear-gradient(#ffd34d, #ffb300); border-radius: 6px 6px 2px 2px; min-height: 2px; }
+  .day .n { font-size: 12px; color: var(--ink); }
+  .day .d { font-size: 11px; color: var(--dim); white-space: nowrap; }
+  .tw { overflow-x: auto; }
+  table { width:100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--dim); font-weight: 600; font-size: 13px; position: sticky; top: 0; background: var(--card); }
+  td.num { font-variant-numeric: tabular-nums; }
+  .pill { font-size: 12px; padding: 3px 8px; border-radius: 99px; background: var(--card2); color: var(--dim); }
+  input[type=search] { font-family: inherit; font-size: 15px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: var(--ink); min-width: 200px; }
+  .muted { color: var(--dim); }
+  .err { color: var(--red); }
+  @media (max-width: 600px) { header h1 { font-size: 22px; } .kpi .v { font-size: 30px; } main, header { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <img src="icon.png" alt="">
+  <div><h1>إحصائيات عداء المعرفة</h1><div class="sub">تصميم وفكرة: الأستاذ عبدالرحيم مبارك الرحبي</div></div>
+  <div class="sp"></div>
+  <span id="me" class="muted"></span>
+  <button id="btn-refresh" class="hidden-when-out">تحديث</button>
+  <button id="btn-out" class="hidden-when-out">خروج</button>
+</header>
+<main id="app"><div class="center"><p>جارٍ التحميل…</p></div></main>
+
+<script type="module">
+import { auth, db, TEACHER_EMAIL, signInGoogle, signOut, onAuthStateChanged, collection, query, orderBy, limit, getDocs, friendlyError } from "./edu-firebase.js";
+
+const app = document.getElementById("app");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ar = (n) => Number(n || 0).toLocaleString("ar-EG");
+const toDate = (t) => (t && t.toDate ? t.toDate() : null);
+const fmt = (d) => d ? d.toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—";
+const dayKey = (d) => d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+const MODES = { Learn: "وضع التعلّم", Endless: "التحدي اللانهائي", MathKing: "ملك العمليات" };
+const OPS = { Add: "جمع", Sub: "طرح", Mul: "ضرب", Div: "قسمة" };
+const DEV = { ipad: "آيباد", iphone: "آيفون", "android-tablet": "تابلت أندرويد", "android-phone": "هاتف أندرويد", computer: "حاسوب" };
+const fmtValue = (r) => {
+  const v = Number(r.value) || 0;
+  if (r.mode === "Learn") { const m = Math.floor(v / 60), s = Math.round(v % 60); return ar(m) + " د " + ar(s) + " ث"; }
+  return ar(Math.round(v)) + " م";
+};
+let data = null;
+
+for (const b of document.querySelectorAll(".hidden-when-out")) b.style.display = "none";
+document.getElementById("btn-out").onclick = () => signOut(auth);
+document.getElementById("btn-refresh").onclick = () => load();
+
+function signInView(msg) {
+  for (const b of document.querySelectorAll(".hidden-when-out")) b.style.display = "none";
+  document.getElementById("me").textContent = "";
+  app.innerHTML = `<div class="center"><h2>صفحة المعلم</h2><p>${msg || "سجّل الدخول بحساب المعلم لعرض من دخل اللعبة ونتائجهم"}</p><p id="e" class="err"></p><button class="primary" id="go">الدخول بحساب Google</button></div>`;
+  document.getElementById("go").onclick = async () => { try { await signInGoogle(); } catch (e) { document.getElementById("e").textContent = friendlyError(e); } };
+}
+
+onAuthStateChanged(auth, (u) => {
+  if (!u) return signInView();
+  if ((u.email || "").toLowerCase() !== TEACHER_EMAIL) return signInView("هذه الصفحة للمعلم فقط. أنت داخل بحساب " + esc(u.email) + " — اخرج وادخل بحساب المعلم.");
+  for (const b of document.querySelectorAll(".hidden-when-out")) b.style.display = "";
+  document.getElementById("me").textContent = u.email;
+  load();
+});
+
+async function load() {
+  app.innerHTML = `<div class="center"><p>جارٍ جلب البيانات…</p></div>`;
+  try {
+    const [ps, vs, rs] = await Promise.all([
+      getDocs(query(collection(db, "players"), orderBy("lastSeen", "desc"), limit(2000))),
+      getDocs(query(collection(db, "visits"), orderBy("at", "desc"), limit(3000))),
+      getDocs(query(collection(db, "results"), orderBy("at", "desc"), limit(1000))),
+    ]);
+    data = { players: ps.docs.map((d) => ({ id: d.id, ...d.data() })), visits: vs.docs.map((d) => d.data()), results: rs.docs.map((d) => d.data()) };
+    render();
+  } catch (e) {
+    app.innerHTML = `<div class="center"><p class="err">تعذّر جلب البيانات: ${esc(e.code || e.message)}</p></div>`;
+  }
+}
+
+function render(filter = "") {
+  const { players, visits, results } = data;
+  const now = new Date(), today = dayKey(now);
+  const weekAgo = new Date(now - 7 * 864e5);
+  const visitsToday = visits.filter((v) => toDate(v.at) && dayKey(toDate(v.at)) === today);
+  const studentsToday = new Set(visitsToday.map((v) => v.uid)).size;
+  const activeWeek = new Set(visits.filter((v) => toDate(v.at) > weekAgo).map((v) => v.uid)).size;
+
+  // last 14 days
+  const days = [];
+  for (let i = 13; i >= 0; i--) { const d = new Date(now - i * 864e5); days.push({ k: dayKey(d), d, n: 0, u: new Set() }); }
+  for (const v of visits) { const d = toDate(v.at); if (!d) continue; const x = days.find((y) => y.k === dayKey(d)); if (x) { x.n++; x.u.add(v.uid); } }
+  const maxU = Math.max(1, ...days.map((x) => x.u.size));
+
+  const f = filter.trim().toLowerCase();
+  const plist = players.filter((p) => !f || (p.name || "").toLowerCase().includes(f) || (p.email || "").toLowerCase().includes(f));
+
+  app.innerHTML = `
+  <div class="kpis">
+    <div class="kpi"><div class="v">${ar(players.length)}</div><div class="l">طالب دخل اللعبة (إجمالي)</div></div>
+    <div class="kpi"><div class="v">${ar(studentsToday)}</div><div class="l">طالب دخل اليوم</div></div>
+    <div class="kpi"><div class="v">${ar(activeWeek)}</div><div class="l">طالب نشط آخر ٧ أيام</div></div>
+    <div class="kpi"><div class="v">${ar(visits.length)}</div><div class="l">مرة فُتحت فيها اللعبة</div></div>
+    <div class="kpi"><div class="v">${ar(results.length)}</div><div class="l">جولة لُعبت</div></div>
+  </div>
+
+  <section>
+    <h2>الطلاب في آخر ١٤ يوماً</h2>
+    <div class="days">${days.map((x) => `<div class="day" title="${ar(x.n)} دخول"><div class="n">${x.u.size ? ar(x.u.size) : ""}</div><div class="bar" style="height:${Math.round((x.u.size / maxU) * 110)}px"></div><div class="d">${x.d.toLocaleDateString("ar-EG", { day: "numeric", month: "numeric" })}</div></div>`).join("")}</div>
+  </section>
+
+  <section>
+    <h2>الطلاب <span class="pill">${ar(plist.length)}</span><span class="sp"></span>
+      <input type="search" id="q" placeholder="ابحث بالاسم أو البريد" value="${esc(filter)}">
+      <button class="green" id="csv">تنزيل Excel (CSV)</button></h2>
+    <div class="tw"><table>
+      <thead><tr><th>#</th><th>الاسم</th><th>البريد</th><th>مرات الدخول</th><th>الجولات</th><th>أول دخول</th><th>آخر دخول</th><th>الجهاز</th></tr></thead>
+      <tbody>${plist.map((p, i) => `<tr><td class="num">${ar(i + 1)}</td><td>${esc(p.name)}</td><td class="muted">${esc(p.email)}</td><td class="num">${ar(p.visits)}</td><td class="num">${ar(p.runs)}</td><td>${fmt(toDate(p.firstSeen))}</td><td>${fmt(toDate(p.lastSeen))}</td><td>${esc(DEV[p.device] || p.device || "")}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">لا أحد بعد</td></tr>`}</tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>آخر الجولات <span class="pill">${ar(results.length)}</span></h2>
+    <div class="tw"><table>
+      <thead><tr><th>الوقت</th><th>الطالب</th><th>الوضع</th><th>البنك / العملية</th><th>النتيجة</th><th>صحيحة</th><th>خاطئة</th><th>تفاصيل</th></tr></thead>
+      <tbody>${results.slice(0, 200).map((r) => `<tr><td>${fmt(toDate(r.at))}</td><td>${esc(r.name)}</td><td>${esc(MODES[r.mode] || r.mode)}</td><td>${esc(OPS[r.bank] || r.bank)}</td><td class="num">${fmtValue(r)}</td><td class="num">${ar(r.correct)}</td><td class="num">${ar(r.wrong)}</td><td class="muted">${esc(r.detail)}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">لا جولات بعد</td></tr>`}</tbody>
+    </table></div>
+  </section>`;
+
+  const q = document.getElementById("q");
+  q.oninput = () => { const pos = q.selectionStart; render(q.value); const n = document.getElementById("q"); n.focus(); n.setSelectionRange(pos, pos); };
+  document.getElementById("csv").onclick = () => downloadCsv(plist);
+}
+
+function downloadCsv(list) {
+  const rows = [["الاسم", "البريد", "مرات الدخول", "الجولات", "أول دخول", "آخر دخول", "الجهاز"]];
+  for (const p of list) rows.push([p.name, p.email, p.visits || 0, p.runs || 0, (toDate(p.firstSeen) || "").toLocaleString?.("ar-EG") || "", (toDate(p.lastSeen) || "").toLocaleString?.("ar-EG") || "", DEV[p.device] || p.device || ""]);
+  const csv = "﻿" + rows.map((r) => r.map((c) => '"' + String(c ?? "").replace(/"/g, '""') + '"').join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "طلاب-عداء-المعرفة.csv"; a.click();
+}
+</script>
+</body>
+</html>
