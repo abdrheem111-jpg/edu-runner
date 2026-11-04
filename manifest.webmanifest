@@ -1,0 +1,12 @@
+{
+  "name": "عداء المعرفة",
+  "short_name": "عداء المعرفة",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b1230",
+  "theme_color": "#101a3a",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}

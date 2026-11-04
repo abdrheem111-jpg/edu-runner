@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="عداء المعرفة">
+  <meta name="theme-color" content="#101a3a">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" href="icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>عداء المعرفة</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b1230;
+      touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+    #unity-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; background: #0b1230; outline: none; }
+    #loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+      background: radial-gradient(circle at 50% 35%, #233a85 0%, #0b1230 70%); color: #fff;
+      font-family: "Segoe UI", Tahoma, "Geeza Pro", "Noto Kufi Arabic", sans-serif; z-index: 5; transition: opacity .5s; }
+    #loader img { width: 140px; height: 140px; border-radius: 28px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+    #loader h1 { margin: 0; font-size: 44px; color: #ffd34d; text-shadow: 0 4px 0 rgba(0,0,0,.35); }
+    #bar { width: min(70vw, 520px); height: 18px; border-radius: 10px; background: rgba(255,255,255,.15); overflow: hidden; }
+    #fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ffb300, #ffe066); border-radius: 10px; transition: width .2s; }
+    #msg { font-size: 20px; opacity: .85; }
+    #credit { position: absolute; bottom: 18px; font-size: 16px; opacity: .7; }
+    #rotate { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+      background: #0b1230; color: #fff; font-family: inherit; font-size: 26px; z-index: 10; text-align: center; padding: 24px; }
+    #rotate .phone { width: 70px; height: 120px; border: 6px solid #ffd34d; border-radius: 14px; animation: turn 1.8s ease-in-out infinite; }
+    @keyframes turn { 0%,20% { transform: rotate(0deg); } 60%,100% { transform: rotate(-90deg); } }
+    @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="loader">
+    <img src="icon.png" alt="">
+    <h1>عداء المعرفة</h1>
+    <div id="bar"><div id="fill"></div></div>
+    <div id="msg">جارٍ تحميل اللعبة…</div>
+    <div id="credit">تصميم وفكرة: الأستاذ عبدالرحيم مبارك الرحبي</div>
+  </div>
+  <div id="rotate"><div class="phone"></div><div>أدِر الجهاز بشكل أفقي للعب</div></div>
+  <script>
+    var canvas = document.getElementById('unity-canvas');
+    var fill = document.getElementById('fill'), msg = document.getElementById('msg'), loader = document.getElementById('loader');
+    var dpr = Math.min(window.devicePixelRatio || 1, /iPad|iPhone|Android|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1 ? 1.5 : 2);
+    var config = {
+      arguments: [],
+      dataUrl: "Build/EduRunner_Web.data.unityweb",
+      frameworkUrl: "Build/EduRunner_Web.framework.js.unityweb",
+      codeUrl: "Build/EduRunner_Web.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "عداء المعرفة",
+      productVersion: "0.1.0",
+      devicePixelRatio: dpr,
+      matchWebGLToCanvasSize: true,
+      autoSyncPersistentDataPath: true,
+      showBanner: function (text, type) { if (type === 'error') { msg.textContent = text; console.error(text); } else console.warn(text); }
+    };
+    // stop the page itself from scrolling / zooming while the game is touched
+    ['touchmove', 'gesturestart', 'dblclick'].forEach(function (e) {
+      document.addEventListener(e, function (ev) { ev.preventDefault(); }, { passive: false });
+    });
+    // tap once to go full screen on tablets (browsers need a tap for that)
+    function goFull() {
+      var el = document.documentElement;
+      var rq = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (rq && !document.fullscreenElement && !document.webkitFullscreenElement) { try { rq.call(el); } catch (e) {} }
+      try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {}); } catch (e) {}
+    }
+    if (navigator.maxTouchPoints > 0) document.addEventListener('touchend', goFull, { once: true });
+
+    var script = document.createElement('script');
+    script.src = "Build/EduRunner_Web.loader.js";
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (p) {
+        fill.style.width = Math.round(p * 100) + '%';
+        if (p >= 0.9) msg.textContent = 'لحظات وتبدأ…';
+      }).then(function (inst) {
+        window.unityInstance = inst;
+        loader.style.opacity = '0'; setTimeout(function () { loader.remove(); }, 600);
+      }).catch(function (e) { msg.textContent = 'تعذّر تشغيل اللعبة على هذا المتصفح: ' + e; });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
