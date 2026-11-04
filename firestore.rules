@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// عداء المعرفة — يلعب فقط من أضافه المعلم، والطالب يكتب بياناته فقط، والمعلم وحده يقرأ الإحصائيات
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function isTeacher() {
+      return signedIn() && request.auth.token.email == 'abdrheem.111@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    // مسموح: المعلم، أو بريده في القائمة، أو نطاق مدرسته (مثل ‎@school.edu.om)
+    function isAllowed() {
+      return isTeacher() || (signedIn() && request.auth.token.email_verified == true && (
+        exists(/databases/$(database)/documents/allowed/$(myEmail())) ||
+        exists(/databases/$(database)/documents/allowed/$('@' + myEmail().split('@')[1]))));
+    }
+
+    // قائمة الحسابات المسموحة — المعلم يعدّلها، والطالب يرى وثيقته فقط
+    match /allowed/{id} {
+      allow read: if isTeacher() || (signedIn() && (id == myEmail() || id == '@' + myEmail().split('@')[1]));
+      allow write: if isTeacher();
+    }
+
+    // طلبات الدخول من حسابات غير مسموحة
+    match /requests/{uid} {
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'at', 'device'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80;
+      allow read, delete: if isTeacher();
+    }
+
+    // طالب واحد = وثيقة واحدة
+    match /players/{uid} {
+      allow read: if isTeacher() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if isAllowed() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'photo', 'firstSeen', 'lastSeen', 'visits', 'runs', 'device'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80;
+      allow delete: if isTeacher();
+    }
+
+    // كل مرة يفتح فيها الطالب اللعبة
+    match /visits/{id} {
+      allow create: if isAllowed() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'at', 'device']);
+      allow read, delete: if isTeacher();
+    }
+
+    // كل جولة منتهية
+    match /results/{id} {
+      allow create: if isAllowed() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'at', 'board', 'mode', 'bank', 'value', 'detail', 'correct', 'wrong', 'device']);
+      allow read, delete: if isTeacher();
+    }
+  }
+}

@@ -1,7 +1,7 @@
 // Firebase project of the game (public web configuration – access is protected by the Firestore rules)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, writeBatch, collection, serverTimestamp, increment, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDcS-_0Sl6tEf12gBc2wWcjcAJIS4RgaJA",
@@ -22,7 +22,23 @@ export async function signInGoogle() {
   p.setCustomParameters({ prompt: "select_account" });
   return signInWithPopup(auth, p);
 }
-export { signOut, onAuthStateChanged, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment, query, orderBy, limit, getDocs };
+export { signOut, onAuthStateChanged, doc, getDoc, setDoc, addDoc, deleteDoc, writeBatch, collection, serverTimestamp, increment, query, orderBy, limit, getDocs };
+
+/// Only accounts the teacher added may play: allowed/{email} for one student, allowed/@school.com for a whole school domain.
+export async function hasAccess(u) {
+  const em = (u.email || "").toLowerCase();
+  if (!em) return false;
+  if (em === TEACHER_EMAIL) return true;
+  try {
+    if ((await getDoc(doc(db, "allowed", em))).exists()) return true;
+    if ((await getDoc(doc(db, "allowed", "@" + em.split("@")[1]))).exists()) return true;
+  } catch (e) {
+    console.warn("access check", e);
+    // the database rules don't know the list yet (set-up not finished): don't lock everyone out
+    if (e && e.code === "permission-denied") return true;
+  }
+  return false;
+}
 
 export function deviceKind() {
   const ua = navigator.userAgent || "";

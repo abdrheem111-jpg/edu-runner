@@ -36,6 +36,11 @@
     #btn-play { background: linear-gradient(#3fd36b, #22a94c); color: #fff; font-size: 28px !important; padding: 16px 60px !important; }
     #btn-switch { background: transparent; color: #cfd8ff; box-shadow: none !important; font-size: 17px !important; padding: 6px 12px !important; text-decoration: underline; }
     #login-note { font-size: 16px; opacity: .8; max-width: 520px; text-align: center; line-height: 1.6; }
+    #login-denied { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; max-width: 600px; }
+    .denied-title { font-size: 26px; font-weight: 800; color: #ffb4b4; }
+    .denied-text { font-size: 18px; line-height: 1.7; opacity: .9; }
+    #btn-recheck { background: linear-gradient(#ffd34d, #ffb300); color: #3a2a00; }
+    #btn-switch2 { background: transparent; color: #cfd8ff; box-shadow: none !important; font-size: 17px !important; padding: 6px 12px !important; text-decoration: underline; }
     #login-err { font-size: 17px; color: #ff9a9a; max-width: 560px; text-align: center; }
     .hidden { display: none !important; }
     #rotate { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
@@ -57,6 +62,12 @@
         <div class="who"><img id="user-photo" alt="" referrerpolicy="no-referrer"><span>أهلاً <b id="user-name"></b></span></div>
         <button id="btn-play">ابدأ اللعب</button>
         <button id="btn-switch">لست أنت؟ الدخول بحساب آخر</button>
+      </div>
+      <div id="login-denied" class="hidden">
+        <div class="denied-title">⛔ حسابك غير مسجّل في قائمة اللاعبين</div>
+        <div class="denied-text">الحساب <b id="denied-email" dir="ltr"></b> لم يضفه المعلم بعد.<br>وصل طلبك للمعلم — بعد ما يضيفك اضغط «تحقّق مرة ثانية».</div>
+        <button id="btn-recheck">تحقّق مرة ثانية</button>
+        <button id="btn-switch2">الدخول بحساب آخر</button>
       </div>
       <div id="login-note">سجّل الدخول بحسابك ليظهر اسمك في لوحة المتصدرين</div>
       <div id="login-err"></div>

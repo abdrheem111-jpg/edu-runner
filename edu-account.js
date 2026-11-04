@@ -1,5 +1,5 @@
 // Sign-in screen of the game: Google account → player name, and every visit / finished round is saved for the teacher.
-import { auth, db, signInGoogle, signOut, onAuthStateChanged, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment, deviceKind, friendlyError } from "./edu-firebase.js";
+import { auth, db, signInGoogle, signOut, onAuthStateChanged, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment, deviceKind, friendlyError, hasAccess } from "./edu-firebase.js";
 
 const $ = (id) => document.getElementById(id);
 const device = deviceKind();
@@ -9,7 +9,8 @@ function show(state) {
   $("login-wait").classList.toggle("hidden", state !== "wait");
   $("btn-google").classList.toggle("hidden", state !== "out");
   $("login-user").classList.toggle("hidden", state !== "in");
-  $("login-note").classList.toggle("hidden", state === "in");
+  $("login-denied").classList.toggle("hidden", state !== "denied");
+  $("login-note").classList.toggle("hidden", state === "in" || state === "denied");
 }
 
 function shortName(u) {
@@ -17,12 +18,32 @@ function shortName(u) {
   return n.length > 30 ? n.slice(0, 30) : n;
 }
 
-onAuthStateChanged(auth, (u) => {
-  current = u;
-  if (!u) { show("out"); return; }
+async function checkAndShow(u) {
+  show("wait");
+  if (!(await hasAccess(u))) {
+    if (current !== u) return;
+    $("denied-email").textContent = u.email || "";
+    show("denied");
+    // let the teacher see who is waiting (stats page → "طلبات الدخول")
+    try { await setDoc(doc(db, "requests", u.uid), { name: shortName(u), email: (u.email || "").toLowerCase(), at: serverTimestamp(), device }); } catch (e) { console.warn("request", e); }
+    return;
+  }
+  if (current !== u) return;
   $("user-name").textContent = shortName(u);
   if (u.photoURL) { $("user-photo").src = u.photoURL; $("user-photo").classList.remove("hidden"); } else $("user-photo").classList.add("hidden");
   show("in");
+}
+
+onAuthStateChanged(auth, (u) => {
+  current = u;
+  if (!u) { show("out"); return; }
+  checkAndShow(u);
+});
+
+$("btn-recheck").addEventListener("click", () => { $("login-err").textContent = ""; if (current) checkAndShow(current); });
+$("btn-switch2").addEventListener("click", async () => {
+  $("login-err").textContent = "";
+  try { await signInGoogle(); } catch (e) { $("login-err").textContent = friendlyError(e); }
 });
 
 $("btn-google").addEventListener("click", async () => {
@@ -37,7 +58,7 @@ $("btn-switch").addEventListener("click", async () => {
 });
 
 $("btn-play").addEventListener("click", async () => {
-  const u = current; if (!u) return;
+  const u = current; if (!u || $("login-user").classList.contains("hidden")) return;
   const name = shortName(u);
   window.eduPlayerName = name;
   window.eduStartGame();              // the download starts right away; saving the visit happens alongside
