@@ -108,13 +108,13 @@ async function load() {
   app.innerHTML = `<div class="center"><p>جارٍ جلب البيانات…</p></div>`;
   try {
     const [al, rq, ps, vs, rs] = await Promise.all([
-      getDocs(collection(db, "allowed")),
-      getDocs(query(collection(db, "requests"), orderBy("at", "desc"), limit(500))),
+      getDocs(collection(db, "allowed")).catch(() => null),
+      getDocs(query(collection(db, "requests"), orderBy("at", "desc"), limit(500))).catch(() => null),
       getDocs(query(collection(db, "players"), orderBy("lastSeen", "desc"), limit(2000))),
       getDocs(query(collection(db, "visits"), orderBy("at", "desc"), limit(3000))),
       getDocs(query(collection(db, "results"), orderBy("at", "desc"), limit(1000))),
     ]);
-    data = { allowed: al.docs.map((d) => ({ id: d.id, ...d.data() })), requests: rq.docs.map((d) => ({ uid: d.id, ...d.data() })),
+    data = { rulesOld: !al, allowed: al ? al.docs.map((d) => ({ id: d.id, ...d.data() })) : [], requests: rq ? rq.docs.map((d) => ({ uid: d.id, ...d.data() })) : [],
              players: ps.docs.map((d) => ({ id: d.id, ...d.data() })), visits: vs.docs.map((d) => d.data()), results: rs.docs.map((d) => d.data()) };
     render();
   } catch (e) {
@@ -155,6 +155,7 @@ function render(filter = "") {
 
   <section>
     <h2>🔒 الحسابات المسموح لها باللعب <span class="pill">${ar(emails.length)} حساب${domains.length ? " • " + ar(domains.length) + " نطاق" : ""}</span></h2>
+    ${data.rulesOld ? `<p class="err">قواعد قاعدة البيانات في Firebase لم تُحدَّث بعد — الصق محتوى الملف firestore.rules في Firestore ← Rules ثم Publish، وبعدها تعمل القائمة.</p>` : ""}
     <div class="hint">اكتب بريد كل طالب في سطر (أو افصل بفاصلة). لتسمح لكل حسابات مدرسة كاملة اكتب النطاق مثل <b dir="ltr">@school.edu.om</b>. أي حساب غير موجود هنا يظهر له «حسابك غير مسجّل» ولا يدخل اللعبة.</div>
     <textarea id="add-box" placeholder="student1@gmail.com&#10;student2@gmail.com"></textarea>
     <div class="row"><button class="green" id="add-btn">إضافة إلى القائمة</button><span id="add-msg" class="hint"></span></div>
